@@ -4,8 +4,8 @@ __pycache__/
 
 .streamlit/secrets.toml
 
-event_data/processed/*.parquet
-event_data/processed/*.duckdb
+# event_data/processed/*.parquet
+# event_data/processed/*.duckdb
 
 analysis/
 notebooks/

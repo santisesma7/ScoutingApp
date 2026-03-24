@@ -1,6 +1,8 @@
 from pathlib import Path
 import streamlit as st
+import os
 
+from src.data_downloader import ensure_data_files
 from src.build_top5_events import build_top5_events
 from src.update_player_metrics import update_player_metrics
 from src.update_team_metrics import update_team_metrics
@@ -8,7 +10,17 @@ from src.update_player_clusters import update_player_clusters
 from src.update_all import update_all
 from src.enrich_player_metrics import enrich_player_metrics
 
+
+# DOBLE OPCIÓN DE ESTAR EN LOCAL O EN NUBE, PARA ACCEDER A ARCHIVOS LOCALES O GOOGLE DRIVE
+
+IS_CLOUD = os.getenv("IS_CLOUD", "False") == "True"
+if IS_CLOUD:
+    ensure_data_files()
+
+
+
 st.set_page_config(page_title="Scouting App", layout="wide")
+
 
 # --------------------------------------------------
 # ESTILO GENERAL
@@ -238,59 +250,60 @@ st.divider()
 st.markdown("## Actualización de datos")
 st.caption("Estos procesos reconstruyen la base analítica y son el núcleo operativo de la aplicación.")
 
-col_up1, col_up2 = st.columns(2)
+if not IS_CLOUD:
+    col_up1, col_up2 = st.columns(2)
 
-with col_up1:
-    st.markdown(
-        """
-        <div class="section-card">
-            <div class="section-title">🔄 Actualización completa</div>
-            <div class="section-text">
-                Descarga nuevos eventos desde el scraper, reconstruye el dataset top 5,
-                actualiza métricas de jugador y equipo, vuelve a enriquecer la metadata
-                y recalcula los clusters de jugadores.
+    with col_up1:
+        st.markdown(
+            """
+            <div class="section-card">
+                <div class="section-title">🔄 Actualización completa</div>
+                <div class="section-text">
+                    Descarga nuevos eventos desde el scraper, reconstruye el dataset top 5,
+                    actualiza métricas de jugador y equipo, vuelve a enriquecer la metadata
+                    y recalcula los clusters de jugadores.
+                </div>
             </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+            """,
+            unsafe_allow_html=True,
+        )
 
-    if st.button("Actualizar todo", width="stretch"):
-        with st.spinner("Descargando eventos, consolidando top 5, reconstruyendo métricas y recalculando clusters..."):
-            try:
-                update_all()
-                st.cache_data.clear()
-                st.success("Actualización completa terminada correctamente.")
-            except Exception as e:
-                st.error(f"Error al actualizar: {e}")
+        if st.button("Actualizar todo", width="stretch"):
+            with st.spinner("Descargando eventos, consolidando top 5, reconstruyendo métricas y recalculando clusters..."):
+                try:
+                    update_all()
+                    st.cache_data.clear()
+                    st.success("Actualización completa terminada correctamente.")
+                except Exception as e:
+                    st.error(f"Error al actualizar: {e}")
 
-with col_up2:
-    st.markdown(
-        """
-        <div class="section-card">
-            <div class="section-title">♻️ Recalcular base analítica</div>
-            <div class="section-text">
-                Reconstruye el dataset consolidado top 5 a partir de los parquet por liga,
-                actualiza métricas, vuelve a enriquecer el dataset de jugadores
-                y recalcula los clusters sin necesidad de volver a scrapear.
+    with col_up2:
+        st.markdown(
+            """
+            <div class="section-card">
+                <div class="section-title">♻️ Recalcular base analítica</div>
+                <div class="section-text">
+                    Reconstruye el dataset consolidado top 5 a partir de los parquet por liga,
+                    actualiza métricas, vuelve a enriquecer el dataset de jugadores
+                    y recalcula los clusters sin necesidad de volver a scrapear.
+                </div>
             </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+            """,
+            unsafe_allow_html=True,
+        )
 
-    if st.button("Actualizar métricas y clusters", width="stretch"):
-        with st.spinner("Reconstruyendo top 5, métricas, metadata y clusters..."):
-            try:
-                build_top5_events()
-                update_player_metrics()
-                update_team_metrics()
-                enrich_player_metrics()
-                update_player_clusters()
-                st.cache_data.clear()
-                st.success("Top 5, métricas, metadata y clusters actualizados correctamente.")
-            except Exception as e:
-                st.error(f"Error al actualizar métricas: {e}")
+        if st.button("Actualizar métricas y clusters", width="stretch"):
+            with st.spinner("Reconstruyendo top 5, métricas, metadata y clusters..."):
+                try:
+                    build_top5_events()
+                    update_player_metrics()
+                    update_team_metrics()
+                    enrich_player_metrics()
+                    update_player_clusters()
+                    st.cache_data.clear()
+                    st.success("Top 5, métricas, metadata y clusters actualizados correctamente.")
+                except Exception as e:
+                    st.error(f"Error al actualizar métricas: {e}")
 
 st.divider()
 
