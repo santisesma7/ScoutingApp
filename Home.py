@@ -1,6 +1,5 @@
 from pathlib import Path
 import streamlit as st
-import os
 
 from src.data_downloader import ensure_data_files
 from src.build_top5_events import build_top5_events
@@ -10,17 +9,13 @@ from src.update_player_clusters import update_player_clusters
 from src.update_all import update_all
 from src.enrich_player_metrics import enrich_player_metrics
 
-
 # DOBLE OPCIÓN DE ESTAR EN LOCAL O EN NUBE, PARA ACCEDER A ARCHIVOS LOCALES O GOOGLE DRIVE
+IS_CLOUD = bool(st.secrets.get("IS_CLOUD", False))
 
-IS_CLOUD = os.getenv("IS_CLOUD", "False") == "True"
 if IS_CLOUD:
     ensure_data_files()
 
-
-
 st.set_page_config(page_title="Scouting App", layout="wide")
-
 
 # --------------------------------------------------
 # ESTILO GENERAL
@@ -248,9 +243,10 @@ st.divider()
 # ACTUALIZACIÓN
 # --------------------------------------------------
 st.markdown("## Actualización de datos")
-st.caption("Estos procesos reconstruyen la base analítica y son el núcleo operativo de la aplicación.")
 
 if not IS_CLOUD:
+    st.caption("Estos procesos reconstruyen la base analítica y son el núcleo operativo de la aplicación.")
+
     col_up1, col_up2 = st.columns(2)
 
     with col_up1:
@@ -305,6 +301,10 @@ if not IS_CLOUD:
                 except Exception as e:
                     st.error(f"Error al actualizar métricas: {e}")
 
+else:
+    st.caption("Modo nube: la aplicación funciona en modo visualización y carga los datos automáticamente desde almacenamiento externo.")
+    st.info("Las actualizaciones de scraping, métricas y clustering se realizan en local y después se reflejan en la versión desplegada.")
+
 st.divider()
 
 # --------------------------------------------------
@@ -350,3 +350,9 @@ st.markdown(
 #         """,
 #         unsafe_allow_html=True,
 #     )
+
+# Código para hacer cambios en la nube a partir de ahora
+
+# git add .
+# git commit -m "Describe el cambio"
+# git push
