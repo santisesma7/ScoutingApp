@@ -8,9 +8,6 @@ import plotly.express as px
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
-from sklearn.mixture import GaussianMixture
-from scipy.spatial.distance import cdist
-
 
 from src.data_loader import load_team_metrics
 from src.team_logos import show_team_logo
@@ -91,17 +88,16 @@ TEAM_METRIC_LABELS = {
     "takeon_success_pct": "% de éxito en regates",
     "dispossessed_match": "Pérdidas por partido",
     "big_chances_created_match": "Grandes ocasiones creadas por partido",
+
+    "ppda": "PPDA",
 }
+
 
 def format_team_metric_name(metric: str) -> str:
     return TEAM_METRIC_LABELS.get(metric, metric)
 
 
 def build_style_mix_from_kmeans_distances(distances: np.ndarray, alpha: float = 2.5) -> np.ndarray:
-    """
-    Convierte distancias a centroides KMeans en una mezcla de estilos.
-    alpha > 1 hace que el estilo principal gane más peso.
-    """
     similarity = 1 / (1 + distances)
     similarity = similarity ** alpha
     style_mix = similarity / similarity.sum(axis=1, keepdims=True)
@@ -109,10 +105,6 @@ def build_style_mix_from_kmeans_distances(distances: np.ndarray, alpha: float = 
 
 
 def get_report_metric_cols(df: pd.DataFrame, extra_excluded: set[str] | None = None) -> list[str]:
-    """
-    Devuelve métricas numéricas para fortalezas/debilidades,
-    excluyendo identificadores, columnas técnicas y métricas de accuracy.
-    """
     excluded = {
         "Team ID",
         "team_name",
@@ -142,25 +134,95 @@ def get_report_metric_cols(df: pd.DataFrame, extra_excluded: set[str] | None = N
             and "accuracy" not in c.lower()
         )
     ]
-
     return metric_cols
 
+
+def style_description_mcb(style_name: str) -> str:
+    descriptions = {
+        "Directo": "Mayor peso del juego largo, la disputa aérea y una progresión menos apoyada en la circulación.",
+        "Llegadores / Vertical": "Más presencia en último tercio, centros, desborde y ataque con intención de acelerar y finalizar.",
+        "Posesión": "Más control del balón, circulación más paciente y progresión apoyada en el pase.",
+    }
+    return descriptions.get(style_name, "")
 
 
 st.set_page_config(page_title="Identificación de Estilos de Juego", layout="wide")
 
-st.title("Identificación de Estilos de Juego")
-st.caption("Análisis del comportamiento de cada equipo dividido en momento con balón (MCB) y momento sin balón (MSB). " \
-"Para el MCB se ha hecho clustering a través de una selección de métricas importantes y definidoras de los distintos estilos de juego posibles. El método utilizado ha sido KMeans y las proporciones del gráfico de tarta han sido calculadas con las distancias a los centroides. " \
-"Para el MSB se ha decidido calcular una métrica que resume bastante bien la intensidad de presión de cada equipo cuando no disponen del balón: PPDA.")
+# --------------------------------------------------
+# ESTILO GENERAL
+# --------------------------------------------------
+st.markdown(
+    """
+    <style>
+    .block-container {
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+        max-width: 1250px;
+    }
+
+    .top-note {
+        padding: 1rem 1.1rem;
+        border-radius: 14px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        margin-bottom: 1rem;
+    }
+
+    .style-card {
+        padding: 1rem 1rem 0.8rem 1rem;
+        border-radius: 14px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        height: 100%;
+    }
+
+    .mini-card {
+        padding: 0.8rem 0.9rem;
+        border-radius: 14px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        height: 100%;
+    }
+
+    .team-head-card {
+        padding: 1rem 1.1rem;
+        border-radius: 16px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+    }
+
+    .small-muted {
+        color: #475569;
+        font-size: 0.93rem;
+        line-height: 1.5;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+st.title("Identificación de estilos de juego")
+st.caption("Análisis del comportamiento colectivo de los equipos en momento con balón (MCB) y momento sin balón (MSB).")
+
+st.markdown(
+    """
+    <div class="top-note">
+        <div class="small-muted">
+            <b>MCB:</b> clasificación de estilos de juego a partir de métricas de posesión, verticalidad y juego directo mediante KMeans.  
+            <b>MSB:</b> análisis de la intensidad de presión a través del indicador PPDA.
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 # --------------------------------------------------
 # CARGA DE DATOS
 # --------------------------------------------------
 df_all = load_team_metrics().copy()
-
-# filtro mínimo de partidos
 df_all = df_all[df_all["matches_played"] >= 10].copy().reset_index(drop=True)
+
+st.divider()
 
 # --------------------------------------------------
 # SELECTOR DE MOMENTO DEL JUEGO
@@ -171,15 +233,13 @@ mode = st.radio(
     horizontal=True
 )
 
+st.divider()
+
 # ==================================================
 # MCB - MOMENTO CON BALÓN
-# KMEANS PARA CLASIFICACIÓN, GRÁFICO Y TARTA
 # ==================================================
 if mode == "MCB - Momento con balón":
 
-    # ---------------------------
-    # CONFIG
-    # ---------------------------
     style_features = [
         "progressive_pass_pct",
         "long_pass_pct",
@@ -203,42 +263,26 @@ if mode == "MCB - Momento con balón":
         "Posesión"
     ]
 
-    # ---------------------------
-    # DATASET MODELO
-    # ---------------------------
     df_model = df_all.copy()
 
     X_model = df_model[style_features].copy()
     X_model = X_model.replace([float("inf"), float("-inf")], pd.NA).fillna(0)
 
-    # ---------------------------
-    # ESCALADO
-    # ---------------------------
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X_model)
 
-    # ---------------------------
-    # PCA SOLO PARA VISUALIZAR
-    # ---------------------------
     pca_2d = PCA(n_components=2, random_state=42)
     X_2d = pca_2d.fit_transform(X_scaled)
 
     df_model["PCA1"] = X_2d[:, 0]
     df_model["PCA2"] = X_2d[:, 1]
 
-    # ---------------------------
-    # KMEANS PARA CLASIFICACIÓN
-    # ---------------------------
     kmeans = KMeans(n_clusters=3, random_state=42, n_init=20)
     k_clusters = kmeans.fit_predict(X_scaled)
 
     df_model["Cluster"] = k_clusters
     df_model["ClusterName"] = df_model["Cluster"].map(cluster_names)
 
-    # ---------------------------
-    # TARTA BASADA EN DISTANCIA A CENTROIDES
-    # ---------------------------
-    # Distancia de cada equipo a cada centroide
     distances = kmeans.transform(X_scaled)
     style_mix = build_style_mix_from_kmeans_distances(distances, alpha=2.5)
 
@@ -246,9 +290,6 @@ if mode == "MCB - Momento con balón":
     df_model["style_vertical"] = style_mix[:, 1]
     df_model["style_possession"] = style_mix[:, 2]
 
-    # ---------------------------
-    # PERFIL DE CLUSTER
-    # ---------------------------
     cluster_profile = pd.DataFrame(X_scaled, columns=X_model.columns)
     cluster_profile["Cluster"] = df_model["Cluster"].values
 
@@ -256,9 +297,6 @@ if mode == "MCB - Momento con balón":
     global_mean = cluster_profile[X_model.columns].mean()
     diff = (cluster_means - global_mean).round(2)
 
-    # ---------------------------
-    # FILTROS VISUALES
-    # ---------------------------
     st.sidebar.header("Filtros")
 
     leagues = sorted(df_model["league"].dropna().unique().tolist())
@@ -281,15 +319,15 @@ if mode == "MCB - Momento con balón":
 
     st.caption(f"Equipos visualizados: {len(df_view)}")
 
-    # ---------------------------
+    # --------------------------------------------------
     # VISTA GLOBAL
-    # ---------------------------
-    st.header("Vista global de clusters")
+    # --------------------------------------------------
+    st.header("Vista global")
 
     col1, col2 = st.columns([1, 2])
 
     with col1:
-        st.subheader("Distribución de equipos por estilo")
+        st.subheader("Distribución por estilo")
 
         cluster_counts = (
             df_view["ClusterName"]
@@ -304,11 +342,11 @@ if mode == "MCB - Momento con balón":
             labels={"x": "Estilo", "y": "Número de equipos"},
             title="Distribución"
         )
-        fig_bar.update_layout(height=600, xaxis_tickangle=0)
+        fig_bar.update_layout(height=560, xaxis_tickangle=0)
         st.plotly_chart(fig_bar, use_container_width=True)
 
     with col2:
-        st.subheader("Mapa de equipos en espacio PCA")
+        st.subheader("Mapa PCA de equipos")
 
         fig_scatter = px.scatter(
             df_view,
@@ -332,13 +370,13 @@ if mode == "MCB - Momento con balón":
             title="Mapa PCA"
         )
         fig_scatter.update_traces(marker=dict(size=11, opacity=0.85))
-        fig_scatter.update_layout(height=600)
+        fig_scatter.update_layout(height=560)
         st.plotly_chart(fig_scatter, use_container_width=True)
 
-    # ---------------------------
+    # --------------------------------------------------
     # RESUMEN DE CADA CLUSTER
-    # ---------------------------
-    st.header("Resumen de los clusters")
+    # --------------------------------------------------
+    st.header("Resumen de estilos")
 
     summary_cols = st.columns(3)
 
@@ -348,15 +386,14 @@ if mode == "MCB - Momento con balón":
 
         with summary_cols[i]:
             st.subheader(cluster_label)
+            st.caption(style_description_mcb(cluster_label))
 
             high_df = pd.DataFrame({
                 "Más altas": [format_team_metric_name(m) for m in cluster_diff.head(5).index],
-                #"Valor": cluster_diff.head(5).values.round(2)
             })
 
             low_df = pd.DataFrame({
                 "Más bajas": [format_team_metric_name(m) for m in cluster_diff.tail(5).sort_values().index],
-                #"Valor": cluster_diff.tail(5).sort_values().values.round(2)
             })
 
             st.markdown("**Variables más altas**")
@@ -364,10 +401,11 @@ if mode == "MCB - Momento con balón":
 
             st.markdown("**Variables más bajas**")
             st.dataframe(low_df, use_container_width=True, hide_index=True)
+            st.markdown("</div>", unsafe_allow_html=True)
 
-    # ---------------------------
-    # INFORME INDIVIDUAL DE EQUIPO
-    # ---------------------------
+    # --------------------------------------------------
+    # INFORME INDIVIDUAL
+    # --------------------------------------------------
     st.markdown("---")
     st.header("Informe individual de equipo")
 
@@ -375,23 +413,47 @@ if mode == "MCB - Momento con balón":
     selected_team = st.selectbox("Selecciona un equipo", team_list)
 
     team_row = df_view[df_view["team_name"] == selected_team].iloc[0]
-    team_cluster = int(team_row["Cluster"])
     team_cluster_name = team_row["ClusterName"]
 
-    head_left, head_right = st.columns([1, 6])
+    head_col1, head_col2, head_col3 = st.columns([1, 3.2, 2.2])
 
-    with head_left:
-        show_team_logo(selected_team, width=160)
+    with head_col1:
+        show_team_logo(selected_team, width=150)
+        st.markdown("</div>", unsafe_allow_html=True)
 
-    with head_right: 
+    with head_col2:
         st.subheader(selected_team)
         st.write(f"**Liga:** {team_row['league']}")
         st.write(f"**Temporada:** {team_row['season']}")
         st.write(f"**Estilo detectado:** {team_cluster_name}")
+        st.caption(style_description_mcb(team_cluster_name))
+        st.markdown("</div>", unsafe_allow_html=True)
 
-    # ---------------------------
+    with head_col3:
+        st.markdown("**Distribución híbrida del estilo**")
+
+        pie_df = pd.DataFrame({
+            "Estilo": ["Directo", "Llegadores / Vertical", "Posesión"],
+            "Valor": [
+                team_row["style_direct"],
+                team_row["style_vertical"],
+                team_row["style_possession"]
+            ]
+        }).sort_values("Valor", ascending=False)
+
+        fig_pie = px.pie(
+            pie_df,
+            names="Estilo",
+            values="Valor",
+            title=None
+        )
+        fig_pie.update_layout(height=300, margin=dict(l=10, r=10, t=10, b=10))
+        st.plotly_chart(fig_pie, use_container_width=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    # --------------------------------------------------
     # FORTALEZAS Y DEBILIDADES
-    # ---------------------------
+    # --------------------------------------------------
     report_metric_cols = get_report_metric_cols(df_model)
 
     X_report = df_model[report_metric_cols].copy()
@@ -414,7 +476,7 @@ if mode == "MCB - Momento con balón":
             "Percentil": top_strengths.values
         })
         st.dataframe(strengths_df, use_container_width=True, hide_index=True)
-        st.bar_chart(strengths_df.set_index("Métrica"))
+        st.markdown("</div>", unsafe_allow_html=True)
 
     with col4:
         st.subheader("Debilidades del equipo")
@@ -423,33 +485,11 @@ if mode == "MCB - Momento con balón":
             "Percentil": top_weaknesses.values
         })
         st.dataframe(weaknesses_df, use_container_width=True, hide_index=True)
-        st.bar_chart(weaknesses_df.set_index("Métrica"))
+        st.markdown("</div>", unsafe_allow_html=True)
 
-    # ---------------------------
-    # TARTA DE ESTILO
-    # ---------------------------
-    st.subheader("Distribución híbrida del estilo")
-
-    pie_df = pd.DataFrame({
-        "Estilo": ["Directo", "Llegadores / Vertical", "Posesión"],
-        "Valor": [
-            team_row["style_direct"],
-            team_row["style_vertical"],
-            team_row["style_possession"]
-        ]
-    }).sort_values("Valor", ascending=False)
-
-    fig_pie = px.pie(
-        pie_df,
-        names="Estilo",
-        values="Valor",
-        title=f"{selected_team} - MCB"
-    )
-    st.plotly_chart(fig_pie, use_container_width=True)
-
-    # ---------------------------
+    # --------------------------------------------------
     # RESUMEN AUTOMÁTICO
-    # ---------------------------
+    # --------------------------------------------------
     st.subheader("Resumen automático")
 
     strength_text = ", ".join([format_team_metric_name(m) for m in top_strengths.index[:3].tolist()])
@@ -466,15 +506,11 @@ if mode == "MCB - Momento con balón":
 
 # ==================================================
 # MSB - MOMENTO SIN BALÓN
-# RANKING DE PPDA COMO ÍNDICE DE PRESIÓN
 # ==================================================
 if mode == "MSB - Momento sin balón":
 
     df_model = df_all.copy()
 
-    # ---------------------------
-    # FILTROS VISUALES
-    # ---------------------------
     st.sidebar.header("Filtros")
 
     leagues = sorted(df_model["league"].dropna().unique().tolist())
@@ -498,9 +534,6 @@ if mode == "MSB - Momento sin balón":
     st.header("Índice de presión (PPDA)")
     st.caption("PPDA: pases permitidos al rival por acción defensiva. Cuanto menor es el PPDA, mayor es la intensidad de presión.")
 
-    # ---------------------------
-    # PREPARAR RANKING
-    # ---------------------------
     ranking_df = (
         df_view[["team_name", "league", "season", "matches_played", "ppda"]]
         .sort_values("ppda", ascending=True)
@@ -510,9 +543,9 @@ if mode == "MSB - Momento sin balón":
     ranking_df["ranking_ppda"] = ranking_df.index + 1
     ranking_df["marker_size"] = 8
 
-    # ---------------------------
+    # --------------------------------------------------
     # VISTA GLOBAL
-    # ---------------------------
+    # --------------------------------------------------
     col1, col2 = st.columns([1.35, 1])
 
     with col1:
@@ -535,7 +568,7 @@ if mode == "MSB - Momento sin balón":
         )
 
     with col2:
-        st.subheader("Distribución de PPDA en la muestra")
+        st.subheader("Distribución de PPDA")
 
         fig_hist = px.histogram(
             df_view,
@@ -543,7 +576,7 @@ if mode == "MSB - Momento sin balón":
             nbins=25,
             title="Distribución de PPDA"
         )
-        fig_hist.update_layout(height=360)
+        fig_hist.update_layout(height=340)
         st.plotly_chart(fig_hist, use_container_width=True)
 
         fig_box = px.box(
@@ -553,12 +586,12 @@ if mode == "MSB - Momento sin balón":
             hover_data=["team_name", "league", "season"],
             title="Distribución por equipo"
         )
-        fig_box.update_layout(height=420)
+        fig_box.update_layout(height=360)
         st.plotly_chart(fig_box, use_container_width=True)
 
-    # ---------------------------
+    # --------------------------------------------------
     # INFORME INDIVIDUAL DE EQUIPO
-    # ---------------------------
+    # --------------------------------------------------
     st.markdown("---")
     st.header("Informe individual de equipo")
 
@@ -567,18 +600,6 @@ if mode == "MSB - Momento sin balón":
 
     team_row = df_view[df_view["team_name"] == selected_team].iloc[0]
 
-    head_left, head_right = st.columns([1, 6])
-
-    with head_left:
-        show_team_logo(selected_team, width=160)
-
-    with head_right:
-        st.subheader(selected_team)
-        st.write(f"**Liga:** {team_row['league']}")
-        st.write(f"**Temporada:** {team_row['season']}")
-        st.write(f"**Partidos:** {team_row['matches_played']}")
-
-    # ranking y percentil
     team_rank = ranking_df.loc[
         ranking_df["team_name"] == selected_team, "ranking_ppda"
     ].iloc[0]
@@ -591,18 +612,6 @@ if mode == "MSB - Momento sin balón":
         ].iloc[0] * 100
     )
 
-    m1, m2, m3 = st.columns(3)
-
-    with m1:
-        st.metric("PPDA", round(team_row["ppda"], 2))
-
-    with m2:
-        st.metric("Ranking de presión", f"{int(team_rank)} / {n_teams}")
-
-    with m3:
-        st.metric("Percentil de presión", f"{pressure_percentile:.1f}")
-
-    # interpretación simple
     ppda_value = team_row["ppda"]
 
     if ppda_value <= 5.5:
@@ -616,18 +625,35 @@ if mode == "MSB - Momento sin balón":
     else:
         pressure_label = "Presión muy baja"
 
-    st.write(f"**Interpretación del PPDA:** {pressure_label}")
+    head_col1, head_col2, head_col3 = st.columns([1, 3.2, 2.2])
 
-    # ---------------------------
-    # COMPARACIÓN VISUAL DEL EQUIPO
-    # ---------------------------
+    with head_col1:
+        show_team_logo(selected_team, width=150)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    with head_col2:
+        st.subheader(selected_team)
+        st.write(f"**Liga:** {team_row['league']}")
+        st.write(f"**Temporada:** {team_row['season']}")
+        st.write(f"**Partidos:** {team_row['matches_played']}")
+        st.write(f"**Interpretación del PPDA:** {pressure_label}")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    with head_col3:
+        st.metric("PPDA", round(team_row["ppda"], 2))
+        st.metric("Ranking de presión", f"{int(team_rank)} / {n_teams}")
+        st.metric("Percentil de presión", f"{pressure_percentile:.1f}")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    # --------------------------------------------------
+    # POSICIÓN EN LA MUESTRA
+    # --------------------------------------------------
     st.subheader("Posición del equipo dentro de la muestra")
 
     rank_plot_df = ranking_df.copy()
     rank_plot_df["selected"] = rank_plot_df["team_name"] == selected_team
     rank_plot_df["marker_size"] = rank_plot_df["selected"].map({True: 16, False: 8})
 
-    # invertir eje: más presión a la derecha
     n_teams = len(rank_plot_df)
     rank_plot_df["ranking_ppda_inv"] = n_teams - rank_plot_df["ranking_ppda"] + 1
 
@@ -645,7 +671,7 @@ if mode == "MSB - Momento sin balón":
     fig_rank.update_layout(
         xaxis_title="Intensidad de presión (más a la derecha = más presión)",
         yaxis_title="PPDA",
-        height=450,
+        height=430,
         showlegend=False
     )
 
@@ -657,10 +683,9 @@ if mode == "MSB - Momento sin balón":
 
     st.plotly_chart(fig_rank, use_container_width=True)
 
-    # ---------------------------
+    # --------------------------------------------------
     # FORTALEZAS Y DEBILIDADES
-    # TODAS LAS MÉTRICAS EXCEPTO ACCURACY
-    # ---------------------------
+    # --------------------------------------------------
     report_metric_cols = get_report_metric_cols(df_model)
 
     X_report = df_model[report_metric_cols].copy()
@@ -683,7 +708,7 @@ if mode == "MSB - Momento sin balón":
             "Percentil": top_strengths.values
         })
         st.dataframe(strengths_df, use_container_width=True, hide_index=True)
-        st.bar_chart(strengths_df.set_index("Métrica"))
+        st.markdown("</div>", unsafe_allow_html=True)
 
     with col4:
         st.subheader("Debilidades del equipo")
@@ -692,11 +717,11 @@ if mode == "MSB - Momento sin balón":
             "Percentil": top_weaknesses.values
         })
         st.dataframe(weaknesses_df, use_container_width=True, hide_index=True)
-        st.bar_chart(weaknesses_df.set_index("Métrica"))
+        st.markdown("</div>", unsafe_allow_html=True)
 
-    # ---------------------------
+    # --------------------------------------------------
     # RESUMEN AUTOMÁTICO
-    # ---------------------------
+    # --------------------------------------------------
     st.subheader("Resumen automático")
 
     strength_text = ", ".join([format_team_metric_name(m) for m in top_strengths.index[:3].tolist()])

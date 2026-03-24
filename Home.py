@@ -329,28 +329,6 @@ st.markdown(
 
 
 
-# with info_col2:
-#     st.markdown(
-#         """
-#         <div class="footer-box" style="text-align:center;">
-#         """,
-#         unsafe_allow_html=True,
-#     )
-
-#     st.image("logos/fotosanti.jpg", width=120)
-
-#     st.markdown(
-#         """
-#         <div class="section-title">Santiago Sesma</div>
-#         <div class="mini-note">
-#             Proyecto de scouting aplicado al fútbol<br>
-#             Trabajo de Fin de Máster
-#         </div>
-#         </div>
-#         """,
-#         unsafe_allow_html=True,
-#     )
-
 # Código para hacer cambios en la nube a partir de ahora
 
 # git add .
