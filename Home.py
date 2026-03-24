@@ -10,7 +10,10 @@ from src.update_all import update_all
 from src.enrich_player_metrics import enrich_player_metrics
 
 # DOBLE OPCIÓN DE ESTAR EN LOCAL O EN NUBE, PARA ACCEDER A ARCHIVOS LOCALES O GOOGLE DRIVE
-IS_CLOUD = bool(st.secrets.get("IS_CLOUD", False))
+try:
+    IS_CLOUD = bool(st.secrets["IS_CLOUD"])
+except Exception:
+    IS_CLOUD = False
 
 if IS_CLOUD:
     ensure_data_files()
