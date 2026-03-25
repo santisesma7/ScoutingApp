@@ -6,10 +6,74 @@ import streamlit as st
 
 from src.data_loader import load_player_metrics
 
+# --------------------------------------------------
+# ESTILO GENERAL
+# --------------------------------------------------
+st.markdown(
+    """
+    <style>
+    .block-container {
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+        max-width: 1250px;
+    }
+
+    .top-note {
+        padding: 1rem 1.1rem;
+        border-radius: 14px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        margin-bottom: 1rem;
+    }
+
+    .style-card {
+        padding: 1rem 1rem 0.8rem 1rem;
+        border-radius: 14px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        height: 100%;
+    }
+
+    .mini-card {
+        padding: 0.8rem 0.9rem;
+        border-radius: 14px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        height: 100%;
+    }
+
+    .team-head-card {
+        padding: 1rem 1.1rem;
+        border-radius: 16px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+    }
+
+    .small-muted {
+        color: #475569;
+        font-size: 0.93rem;
+        line-height: 1.5;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+
 st.set_page_config(page_title="Rankings y comparación", layout="wide")
 
 st.title("Análisis Exploratorio de Métricas")
-st.caption("Explora rankings de cualquier métrica, diseña scatter plots relacionando varias métricas (recomendado: volumen y % éxito) y realiza comparaciones de radar entre jugadores o con la media de su posición y perfil.")
+st.markdown(
+    """
+    <div class="top-note">
+        <div class="small-muted">
+            Explora <b>rankings</b> de cualquier métrica, diseña <b>scatter plots</b> relacionando varias métricas
+            (recomendado: volumen y % éxito) y realiza <b>comparaciones de radar</b> entre jugadores o con la media de su posición y perfil.
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+) 
 
 # --------------------------------------------------
 # CONFIG LABELS
@@ -17,7 +81,7 @@ st.caption("Explora rankings de cualquier métrica, diseña scatter plots relaci
 PLAYER_METRIC_LABELS = {
     "minutes_total": "Minutos",
     "passes_90": "Pases/90",
-    "successful_passes_90": "Pases existosos/90",
+    "successful_passes_90": "Pases exitosos/90",
     "short_passes_90": "Pases cortos/90",
     "medium_passes_90": "Pases medios/90",
     "long_passes_90": "Pases largos/90",
@@ -29,7 +93,7 @@ PLAYER_METRIC_LABELS = {
     "pass_accuracy": "% éxito pase",
     "short_pass_accuracy": "% éxito pase corto",
     "medium_pass_accuracy": "% éxito pase medio",
-    "long_pass_accuracy": "& éxito pase largo",
+    "long_pass_accuracy": "% éxito pase largo",
     "forward_pass_accuracy": "% éxito pase hacia delante",
     "backward_pass_accuracy": "% éxito pase hacia atrás",
     "lateral_pass_accuracy": "% éxito pase lateral",
@@ -250,11 +314,13 @@ if df_view.empty:
     st.warning("No hay jugadores con esos filtros.")
     st.stop()
 
+#st.markdown("---")
 
 # --------------------------------------------------
 # RANKING DINÁMICO
 # --------------------------------------------------
 st.header("Ranking dinámico")
+st.caption("Selecciona una métrica y ordena la muestra para identificar los jugadores más destacados.")
 
 rank_col1, rank_col2 = st.columns([1, 2])
 
@@ -352,6 +418,7 @@ st.dataframe(
 # --------------------------------------------------
 st.markdown("---")
 st.header("Scatter libre")
+st.caption("Especialmente útil para combinar métricas de volumen con métricas de eficiencia.")
 
 scatter_controls_1, scatter_controls_2 = st.columns(2)
 
@@ -451,6 +518,15 @@ with radar_col1:
         horizontal=True
     )
 
+    st.markdown(
+    """
+    <span style='color: #9ca3af; font-size: 0.9rem;'>
+    <b>Escala percentil:</b> muestra en qué posición relativa se encuentra el jugador respecto al resto.<br>
+    <b>Escala Min-Max:</b> refleja mejor la diferencia cuantitativa real entre jugadores en cada métrica.
+    </span>
+    """,
+    unsafe_allow_html=True)
+
 if not radar_metrics:
     st.warning("Selecciona al menos una métrica para el radar.")
     st.stop()
@@ -467,7 +543,7 @@ if radar_reference == "Media de la posición":
     ref_df = df_view[df_view["position_group"] == ref_position]
     if not ref_df.empty:
         reference_rows.append((
-            f"Media {ref_position}",
+            f"Media {format_position_name(ref_position)}",
             ref_df[radar_metrics].mean()
         ))
 

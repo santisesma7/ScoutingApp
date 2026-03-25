@@ -208,7 +208,7 @@ st.markdown(
     """
     <div class="top-note">
         <div class="small-muted">
-            <b>MCB:</b> clasificación de estilos de juego a partir de métricas de posesión, verticalidad y juego directo mediante KMeans.  
+            <b>MCB:</b> clasificación de estilos de juego a partir de métricas de posesión, verticalidad y juego directo mediante KMeans.<br>  
             <b>MSB:</b> análisis de la intensidad de presión a través del indicador PPDA.
         </div>
     </div>
@@ -238,6 +238,55 @@ st.divider()
 # ==================================================
 # MCB - MOMENTO CON BALÓN
 # ==================================================
+def relabel_team_clusters(cluster_means: pd.DataFrame) -> dict:
+    scores = {}
+
+    for cluster_id, row in cluster_means.iterrows():
+
+        possession_score = (
+            row["takeons_match"]
+            - row["long_pass_pct"]
+            - row["avg_pass_length"]
+        )
+
+        direct_score = (
+            row["long_pass_pct"]
+            + row["avg_pass_length"]
+            + row["aerials_match"]
+        )
+
+        vertical_score = (
+            row["passes_final_third_pct"]
+            + row["crosses_match"]
+            + row["progressive_pass_pct"]
+        )
+
+        scores[cluster_id] = {
+            "Posesión": possession_score,
+            "Directo": direct_score,
+            "Llegadores / Vertical": vertical_score,
+        }
+
+    assigned = {}
+    used = set()
+
+    # Directo
+    c_direct = max(scores, key=lambda c: scores[c]["Directo"])
+    assigned[c_direct] = "Directo"
+    used.add(c_direct)
+
+    # Posesión
+    remaining = [c for c in scores if c not in used]
+    c_pos = max(remaining, key=lambda c: scores[c]["Posesión"])
+    assigned[c_pos] = "Posesión"
+    used.add(c_pos)
+
+    # Vertical
+    remaining = [c for c in scores if c not in used]
+    assigned[remaining[0]] = "Llegadores / Vertical"
+
+    return assigned
+
 if mode == "MCB - Momento con balón":
 
     style_features = [
@@ -251,12 +300,7 @@ if mode == "MCB - Momento con balón":
         "aerials_match"
     ]
 
-    cluster_names = {
-        0: "Directo",
-        1: "Llegadores / Vertical",
-        2: "Posesión"
-    }
-
+  
     cluster_order = [
         "Directo",
         "Llegadores / Vertical",
@@ -281,14 +325,6 @@ if mode == "MCB - Momento con balón":
     k_clusters = kmeans.fit_predict(X_scaled)
 
     df_model["Cluster"] = k_clusters
-    df_model["ClusterName"] = df_model["Cluster"].map(cluster_names)
-
-    distances = kmeans.transform(X_scaled)
-    style_mix = build_style_mix_from_kmeans_distances(distances, alpha=2.5)
-
-    df_model["style_direct"] = style_mix[:, 0]
-    df_model["style_vertical"] = style_mix[:, 1]
-    df_model["style_possession"] = style_mix[:, 2]
 
     cluster_profile = pd.DataFrame(X_scaled, columns=X_model.columns)
     cluster_profile["Cluster"] = df_model["Cluster"].values
@@ -296,6 +332,26 @@ if mode == "MCB - Momento con balón":
     cluster_means = cluster_profile.groupby("Cluster").mean()
     global_mean = cluster_profile[X_model.columns].mean()
     diff = (cluster_means - global_mean).round(2)
+
+    cluster_names = relabel_team_clusters(cluster_means)
+    df_model["ClusterName"] = df_model["Cluster"].map(cluster_names)
+
+    distances = kmeans.transform(X_scaled)
+    style_mix = build_style_mix_from_kmeans_distances(distances, alpha=2.5)
+
+    df_model["style_direct"] = 0.0
+    df_model["style_vertical"] = 0.0
+    df_model["style_possession"] = 0.0
+
+    style_label_to_col = {
+        "Directo": "style_direct",
+        "Llegadores / Vertical": "style_vertical",
+        "Posesión": "style_possession",
+    }
+
+    for cluster_id, style_label in cluster_names.items():
+        col_name = style_label_to_col[style_label]
+        df_model[col_name] = style_mix[:, cluster_id]
 
     st.sidebar.header("Filtros")
 
@@ -381,7 +437,11 @@ if mode == "MCB - Momento con balón":
     summary_cols = st.columns(3)
 
     for i, cluster_label in enumerate(cluster_order):
-        cluster_id = i
+
+        cluster_id = next(
+            cid for cid, label in cluster_names.items() if label == cluster_label
+        )
+
         cluster_diff = diff.loc[cluster_id].sort_values(ascending=False)
 
         with summary_cols[i]:

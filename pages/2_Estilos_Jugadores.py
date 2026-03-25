@@ -17,12 +17,74 @@ from src.data_loader import load_player_metrics
 
 st.set_page_config(page_title="Identificación de Perfiles de Jugadores", layout="wide")
 
+# --------------------------------------------------
+# ESTILO GENERAL
+# --------------------------------------------------
+st.markdown(
+    """
+    <style>
+    .block-container {
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+        max-width: 1250px;
+    }
+
+    .top-note {
+        padding: 1rem 1.1rem;
+        border-radius: 14px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        margin-bottom: 1rem;
+    }
+
+    .style-card {
+        padding: 1rem 1rem 0.8rem 1rem;
+        border-radius: 14px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        height: 100%;
+    }
+
+    .mini-card {
+        padding: 0.8rem 0.9rem;
+        border-radius: 14px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        height: 100%;
+    }
+
+    .team-head-card {
+        padding: 1rem 1.1rem;
+        border-radius: 16px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+    }
+
+    .small-muted {
+        color: #475569;
+        font-size: 0.93rem;
+        line-height: 1.5;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 st.title("Identificación de Perfiles de Jugadores")
-st.caption("Exploración de perfiles de jugador por posición a partir de clustering. "
-    "La definición de los clusters se ha realizado mediante KMeans, mientras que la distribución "
-    "de perfiles del gráfico de tarta se calcula a partir de la distancia relativa de cada jugador "
-    "a los centroides del modelo, transformada en una mezcla de pertenencias que permite representar "
-    "la naturaleza híbrida de determinados perfiles.")
+st.markdown(
+    """
+    <div class="top-note">
+        <div class="small-muted">
+            Clasificación de jugadores por posición mediante técnicas de clustering.
+            Los perfiles se generan a partir de métricas de juego y permiten identificar
+            distintos roles dentro de cada posición. La distribución de perfiles se basa
+            en la distancia relativa a los centroides del modelo, lo que permite reflejar
+            la naturaleza híbrida de muchos jugadores.
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+) 
 
 
 def run_position_pipeline(position_group: str, min_minutes: int):
@@ -76,14 +138,14 @@ def format_position_name(position: str) -> str:
 
 st.subheader("Configuración")
 
-col1, col2, col3 = st.columns([1, 1, 1])
+col1, col2 = st.columns([1, 1])
 
 with col1:
     supported_positions = get_supported_positions()
     selected_position = st.selectbox(
         "Posición",
         supported_positions,
-        index=0,
+        index=2,
         format_func=format_position_name,
     )
 
@@ -94,10 +156,6 @@ with col2:
         value=600,
         step=50,
     )
-
-with col3:
-    recalculate = st.button("Actualizar clusters", use_container_width=True)
-
 
 
 # --------------------------------------------------
@@ -112,7 +170,6 @@ needs_refresh = (
     st.session_state["cluster_result"] is None
     or st.session_state["cluster_position"] != selected_position
     or st.session_state["cluster_minutes"] != min_minutes
-    or recalculate
 )
 
 # --------------------------------------------------
@@ -128,10 +185,6 @@ if needs_refresh:
     st.session_state["cluster_result"] = result
     st.session_state["cluster_position"] = selected_position
     st.session_state["cluster_minutes"] = min_minutes
-
-    if recalculate:
-        st.cache_data.clear()
-        st.success("Clusters actualizados y parquet enriquecido guardado.")
 
 result = st.session_state["cluster_result"]
 
@@ -198,17 +251,6 @@ selected_player = st.selectbox(
 
 player_row = get_player_row_with_label(df_pos, selected_player) if selected_player else None
 
-# --------------------------------------------------
-# GRÁFICO GENERAL
-# --------------------------------------------------
-st.subheader("Mapa del clustering")
-
-scatter_fig = plot_umap_with_highlight(
-    df_pos=df_pos,
-    position_group=format_position_name(selected_position),
-    player_label=selected_player,
-)
-st.plotly_chart(scatter_fig, use_container_width=True)
 
 # --------------------------------------------------
 # DETALLE DEL JUGADOR
@@ -249,17 +291,39 @@ if player_row is not None:
                 )
 
         if prob_rows:
-            st.dataframe(pd.DataFrame(prob_rows), use_container_width=True, hide_index=True)
+            df_probs = pd.DataFrame(prob_rows).sort_values(
+                "Probabilidad (%)", ascending=False
+            )
+
+            st.dataframe(df_probs, use_container_width=True, hide_index=True)
         else:
             st.info("No hay probabilidades disponibles para este jugador.")
+
 
     with right:
         pie_fig = plot_profile_pie(player_row, profile_names)
         if pie_fig is not None:
-            pie_fig.update_layout(title=f"Distribución de perfil - {player_row['player_name']}")
+            pie_fig.update_traces(
+                textinfo="percent",
+                hoverinfo="label+percent"
+            )
+
             st.plotly_chart(pie_fig, use_container_width=True)
         else:
             st.info("No hay probabilidades disponibles para este jugador.")
+
+
+# --------------------------------------------------
+# GRÁFICO GENERAL
+# --------------------------------------------------
+#st.subheader("Mapa del clustering")
+
+scatter_fig = plot_umap_with_highlight(
+    df_pos=df_pos,
+    position_group=format_position_name(selected_position),
+    player_label=selected_player,
+)
+st.plotly_chart(scatter_fig, use_container_width=True)
 
 st.divider()
 

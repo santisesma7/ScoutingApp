@@ -6,6 +6,59 @@ from mplsoccer import Pitch, VerticalPitch
 
 from src.data_loader import load_player_metrics, query_events
 
+# --------------------------------------------------
+# ESTILO GENERAL
+# --------------------------------------------------
+st.markdown(
+    """
+    <style>
+    .block-container {
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+        max-width: 1250px;
+    }
+
+    .top-note {
+        padding: 1rem 1.1rem;
+        border-radius: 14px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        margin-bottom: 1rem;
+    }
+
+    .style-card {
+        padding: 1rem 1rem 0.8rem 1rem;
+        border-radius: 14px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        height: 100%;
+    }
+
+    .mini-card {
+        padding: 0.8rem 0.9rem;
+        border-radius: 14px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        height: 100%;
+    }
+
+    .team-head-card {
+        padding: 1rem 1.1rem;
+        border-radius: 16px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+    }
+
+    .small-muted {
+        color: #475569;
+        font-size: 0.93rem;
+        line-height: 1.5;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 
 POSITION_KEY_METRICS = {
     "Midfielder": [
@@ -60,14 +113,14 @@ PLAYER_METRIC_LABELS = {
     "progressive_passes_90": "Pases progresivos/90",
     "progressive_passes_final_third_90": "Pases prog. últ. tercio/90",
     "progressive_pass_pct": "% pases progresivos",
-    "key_passes_90": "Key passes/90",
+    "key_passes_90": "Pases clave/90",
     "crosses_90": "Centros/90",
     "cross_accuracy": "Precisión de centro",
     "shots_90": "Tiros/90",
     "goals_90": "Goles/90",
     "shots_on_target_90": "Tiros a puerta/90",
-    "big_chances_90": "Big chances/90",
-    "big_chances_created_90": "Big chances created/90",
+    "big_chances_90": "Ocasiones claras/90",
+    "big_chances_created_90": "Ocasiones claras creadas/90",
     "shot_accuracy": "Precisión de tiro",
     "goal_conversion": "Conversión de gol",
     "inside_box_shot_pct": "% tiros dentro del área",
@@ -91,6 +144,9 @@ PLAYER_METRIC_LABELS = {
     "long_pass_pct": "% pases largos",
 }
 
+def format_player_metric_name(metric: str) -> str:
+    return PLAYER_METRIC_LABELS.get(metric, metric)
+
 
 POSITION_LABELS = {
     "Goalkeeper": "Portero",
@@ -104,8 +160,51 @@ POSITION_LABELS = {
 def format_position_name(position: str) -> str:
     return POSITION_LABELS.get(position, position)
 
-def format_player_metric_name(metric: str) -> str:
-    return PLAYER_METRIC_LABELS.get(metric, metric)
+
+EVENT_TYPE_LABELS = {
+    "Pass": "Pases",
+    "Shot": "Tiros",
+    "Defensive actions": "Acciones defensivas",
+    "BallRecovery": "Recuperaciones",
+    "Tackle": "Entradas",
+    "Interception": "Intercepciones",
+    "Clearance": "Despejes",
+    "BlockedPass": "Pases bloqueados",
+    "Aerial": "Duelos aéreos",
+    "TakeOn": "Regates",
+}
+
+def format_event_type_name(event_type: str) -> str:
+    return EVENT_TYPE_LABELS.get(event_type, event_type)
+
+
+PASS_VIEW_LABELS = {
+    "All passes": "Todos los pases",
+    "Progressive passes": "Pases progresivos",
+    "Final-third passes": "Pases en último tercio",
+    "Passes into final third": "Pases hacia último tercio",
+    "Key passes": "Pases clave",
+    "Crosses": "Centros",
+    "Long passes": "Pases largos",
+    "Forward passes": "Pases hacia delante",
+    "Backward passes": "Pases hacia atrás",
+    "Lateral passes": "Pases laterales",
+}
+
+def format_pass_view_name(value: str) -> str:
+    return PASS_VIEW_LABELS.get(value, value)
+
+
+SHOT_VIEW_LABELS = {
+    "All shots": "Todos los tiros",
+    "Goals": "Goles",
+    "Shots on target": "Tiros a puerta",
+    "Missed shots": "Tiros fallados",
+    "Shot on post": "Tiros al palo",
+}
+
+def format_shot_view_name(value: str) -> str:
+    return SHOT_VIEW_LABELS.get(value, value)
 
 
 def get_player_style_pie_data(player_row: pd.Series) -> tuple[list[str], list[float]]:
@@ -158,10 +257,20 @@ def get_player_style_pie_data(player_row: pd.Series) -> tuple[list[str], list[fl
     return labels, values
 
 
-st.set_page_config(page_title="Player Profile", layout="wide")
+st.set_page_config(page_title="Informe del Jugador", layout="wide")
 
 st.title("Informe del Jugador")
-st.caption("Creación de un perfil personal del jugador a partir de las métricas más importantes para su rol. Además, se puede visualizar la zona del campo de cada evento en cada partido para dar un mayor contexto.")
+st.markdown(
+    """
+    <div class="top-note">
+        <div class="small-muted">
+            Creación de un perfil personal del jugador a partir de las métricas más importantes para su rol.
+            Además, se puede visualizar la zona del campo de cada evento en cada partido para dar un mayor contexto.
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 # --------------------------------------------------
 # CARGA DE DATOS
@@ -255,10 +364,14 @@ with right_col:
             pie_df,
             names="Perfil",
             values="Valor",
-            title=f"{player_row['player_name']} - Perfil"
+            title=None
         )
-        fig_pie.update_layout(height=360, margin=dict(l=10, r=10, t=50, b=10))
-        st.plotly_chart(fig_pie, use_container_width=True)
+        fig_pie.update_traces(
+            textinfo="percent",
+            hoverinfo="label+percent"
+        )
+        fig_pie.update_layout(height=360, margin=dict(l=10, r=10, t=10, b=10))
+        
     else:
         st.info("No hay información de estilo disponible para este jugador.")
 
@@ -313,7 +426,8 @@ detail_df = pd.DataFrame({
     "Valor": [player_row[c] for c in detail_cols]
 })
 
-st.dataframe(detail_df, use_container_width=True, hide_index=True)
+with st.expander("Ver métricas detalladas"):
+    st.dataframe(detail_df, use_container_width=True, hide_index=True)
 
 st.divider()
 
@@ -326,7 +440,7 @@ team_name_sql = str(player_row["team_name"]).replace("'", "''")
 season_sql = str(player_row["season"]).replace("'", "''")
 
 st.subheader("Campograma de eventos")
-
+st.caption("Visualización espacial de los eventos del jugador para contextualizar su producción y comportamiento sobe el campo.")
 # --------------------------------------------------
 # PARTIDOS DEL JUGADOR
 # --------------------------------------------------
@@ -358,7 +472,7 @@ SELECT
     player_team,
     opponent
 FROM opponents
-ORDER BY match_date
+ORDER BY match_date DESC
 """
 
 player_matches = query_events(matches_sql)
@@ -370,9 +484,9 @@ if not player_matches.empty:
         + " | "
         + player_matches["match_date"].astype(str).str[:10]
     )
-    match_options = ["All matches"] + player_matches["match_label"].tolist()
+    match_options = ["Todos los partidos"] + player_matches["match_label"].tolist()
 else:
-    match_options = ["All matches"]
+    match_options = ["Todos los partidos"]
 
 # --------------------------------------------------
 # SELECTORES
@@ -382,7 +496,7 @@ col1, col2 = st.columns(2)
 with col1:
     selected_match = st.selectbox("Partido", match_options, key="match_selector")
 
-if selected_match == "All matches":
+if selected_match == "Todos los partidos":
     event_type_options = [
         "Pass",
         "Shot",
@@ -412,6 +526,7 @@ with col2:
     selected_event_type = st.selectbox(
         "Tipo de visualización",
         event_type_options,
+        format_func=format_event_type_name,
         key="event_type_selector"
     )
 
@@ -430,7 +545,7 @@ else:
     event_filter_sql = f""""Event Type" = '{selected_event_type}'"""
 
 match_filter_sql = ""
-if selected_match != "All matches":
+if selected_match != "Todos los partidos":
     selected_match_id = int(
         player_matches.loc[player_matches["match_label"] == selected_match, "matchId"].iloc[0]
     )
@@ -490,6 +605,7 @@ if selected_event_type == "Pass":
             "Backward passes",
             "Lateral passes",
         ],
+        format_func=format_pass_view_name,
         key="pass_view_selector"
     )
 
@@ -550,6 +666,7 @@ elif selected_event_type == "Shot":
             "Missed shots",
             "Shot on post",
         ],
+        format_func=format_shot_view_name,
         key="shot_view_selector"
     )
 
@@ -635,14 +752,14 @@ else:
     # ----------------------------------------------
     elif selected_event_type == "Shot":
         shot_color_map = {
-            "Goal": "green",
-            "SavedShot": "blue",
-            "MissedShots": "red",
-            "ShotOnPost": "orange",
-            "ChanceMissed": "purple",
+            "Goal": {"color": "green", "label": "Gol"},
+            "SavedShot": {"color": "blue", "label": "Parado"},
+            "MissedShots": {"color": "red", "label": "Fuera"},
+            "ShotOnPost": {"color": "orange", "label": "Palo"},
+            "ChanceMissed": {"color": "purple", "label": "Ocasión fallada"},
         }
 
-        for event_name, color in shot_color_map.items():
+        for event_name, info in shot_color_map.items():
             subset = player_events[player_events["Event Type"] == event_name].copy()
             if not subset.empty:
                 pitch.scatter(
@@ -650,9 +767,9 @@ else:
                     subset["Start Y"],
                     ax=ax,
                     s=20,
-                    color=color,
+                    color=info["color"],
                     alpha=0.6,
-                    label=event_name
+                    label=info["label"]
                 )
 
         ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1.0), fontsize=8)
@@ -660,13 +777,13 @@ else:
     # ----------------------------------------------
     # DEFENSIVE ACTIONS
     # ----------------------------------------------
-    elif selected_event_type == "Defensive actions" and selected_match != "All matches":
+    elif selected_event_type == "Defensive actions" and selected_match != "Todos los partidos":
         defensive_style = {
-            "BallRecovery": {"marker": "o", "label": "Recovery", "color": "blue"},
-            "Tackle": {"marker": "X", "label": "Tackle", "color": "red"},
-            "Interception": {"marker": "s", "label": "Interception", "color": "green"},
-            "Clearance": {"marker": "^", "label": "Clearance", "color": "orange"},
-            "BlockedPass": {"marker": "D", "label": "Blocked Pass", "color": "purple"},
+            "BallRecovery": {"marker": "o", "label": "Recuperación", "color": "blue"},
+            "Tackle": {"marker": "X", "label": "Entrada", "color": "red"},
+            "Interception": {"marker": "s", "label": "Intercepción", "color": "green"},
+            "Clearance": {"marker": "^", "label": "Despeje", "color": "orange"},
+            "BlockedPass": {"marker": "D", "label": "Pase bloqueado", "color": "purple"},
         }
 
         for event_name, style in defensive_style.items():
@@ -707,7 +824,7 @@ else:
         title += f" | {pass_view}"
     if selected_event_type == "Shot" and "shot_view" in locals():
         title += f" | {shot_view}"
-    if selected_match != "All matches":
+    if selected_match != "Todos los partidos":
         title += f" | {selected_match}"
 
     ax.set_title(title, fontsize=10)
