@@ -5,6 +5,7 @@ import streamlit as st
 from mplsoccer import Pitch, VerticalPitch
 
 from src.data_loader import load_player_metrics, query_events
+from src.player_clustering import plot_profile_pie
 
 # --------------------------------------------------
 # ESTILO GENERAL
@@ -207,54 +208,38 @@ def format_shot_view_name(value: str) -> str:
     return SHOT_VIEW_LABELS.get(value, value)
 
 
-def get_player_style_pie_data(player_row: pd.Series) -> tuple[list[str], list[float]]:
-    position_group = player_row.get("position_group")
+def get_profile_names_from_dataset(
+    df_players: pd.DataFrame,
+    position_group: str
+) -> dict:
+    """
+    Reconstruye el mapping real cluster_id -> cluster_name
+    usando los datos ya guardados en player_metrics_enriched.
+    """
+    df_pos = df_players[
+        (df_players["position_group"] == position_group)
+        & (df_players["cluster"].notna())
+        & (df_players["cluster_name"].notna())
+    ].copy()
 
-    if position_group == "Midfielder":
-        labels = ["Físico / Defensivo", "Ofensivo / Mediapunta", "Organizador"]
-        values = [
-            player_row.get("profile_1_pct", 0),
-            player_row.get("profile_2_pct", 0),
-            player_row.get("profile_3_pct", 0),
-        ]
-    elif position_group == "Center Back":
-        labels = ["Central Directo / Bloque Bajo", "Central de posesión / Línea Alta", "Destructor"]
-        values = [
-            player_row.get("profile_1_pct", 0),
-            player_row.get("profile_2_pct", 0),
-            player_row.get("profile_3_pct", 0),
-        ]
-    elif position_group == "Striker":
-        labels = ["Delantero Referencia", "Delantero Móvil", "Creativo / Falso 9"]
-        values = [
-            player_row.get("profile_1_pct", 0),
-            player_row.get("profile_2_pct", 0),
-            player_row.get("profile_3_pct", 0),
-        ]
-    elif position_group == "Winger":
-        labels = ["Regateador", "Equilibrado", "Creativo / Centrador"]
-        values = [
-            player_row.get("profile_1_pct", 0),
-            player_row.get("profile_2_pct", 0),
-            player_row.get("profile_3_pct", 0),
-        ]
-    elif position_group == "Full Back":
-        labels = ["Defensivo", "Ofensivo"]
-        values = [
-            player_row.get("profile_1_pct", 0),
-            player_row.get("profile_2_pct", 0),
-        ]
-    else:
-        labels = []
-        values = []
+    if df_pos.empty:
+        return {}
 
-    values = [float(v) if pd.notna(v) else 0.0 for v in values]
-    total = sum(values)
+    df_pos["cluster"] = df_pos["cluster"].astype(int)
 
-    if total > 0:
-        values = [v / total for v in values]
+    profile_names = {}
 
-    return labels, values
+    for cluster_id in sorted(df_pos["cluster"].unique()):
+        cluster_rows = df_pos[df_pos["cluster"] == cluster_id]
+
+        if cluster_rows.empty:
+            continue
+
+        most_common_name = cluster_rows["cluster_name"].mode()
+        if not most_common_name.empty:
+            profile_names[cluster_id] = most_common_name.iloc[0]
+
+    return profile_names
 
 
 st.set_page_config(page_title="Informe del Jugador", layout="wide")
@@ -352,28 +337,26 @@ with left_col:
 with right_col:
     st.markdown("**Distribución del perfil**")
 
-    pie_labels, pie_values = get_player_style_pie_data(player_row)
+    profile_names = get_profile_names_from_dataset(
+        player_metrics,
+        player_row["position_group"]
+    )
 
-    if pie_labels and sum(pie_values) > 0:
-        pie_df = pd.DataFrame({
-            "Perfil": pie_labels,
-            "Valor": pie_values
-        }).sort_values("Valor", ascending=False)
+    fig_pie = plot_profile_pie(player_row, profile_names)
 
-        fig_pie = px.pie(
-            pie_df,
-            names="Perfil",
-            values="Valor",
-            title=None
-        )
+    if fig_pie is not None:
         fig_pie.update_traces(
             textinfo="percent",
             hoverinfo="label+percent"
         )
-        fig_pie.update_layout(height=360, margin=dict(l=10, r=10, t=10, b=10))
-        
+        fig_pie.update_layout(
+            height=360,
+            margin=dict(l=10, r=10, t=10, b=10),
+            title=None
+        )
+
         st.plotly_chart(fig_pie, use_container_width=True)
-        
+
     else:
         st.info("No hay información de estilo disponible para este jugador.")
 
