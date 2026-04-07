@@ -6,6 +6,10 @@ from mplsoccer import Pitch, VerticalPitch
 
 from src.data_loader import load_player_metrics, query_events
 from src.player_clustering import plot_profile_pie
+from src.auth import check_login
+
+if not check_login():
+    st.stop()
 
 # --------------------------------------------------
 # ESTILO GENERAL

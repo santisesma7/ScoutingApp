@@ -13,6 +13,10 @@ from src.player_clustering import (
     update_player_position
 )
 from src.data_loader import load_player_metrics
+from src.auth import check_login
+
+if not check_login():
+    st.stop()
 
 
 st.set_page_config(page_title="Identificación de Perfiles de Jugadores", layout="wide")

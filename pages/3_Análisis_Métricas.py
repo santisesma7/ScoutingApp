@@ -5,6 +5,10 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from src.data_loader import load_player_metrics
+from src.auth import check_login
+
+if not check_login():
+    st.stop()
 
 # --------------------------------------------------
 # ESTILO GENERAL

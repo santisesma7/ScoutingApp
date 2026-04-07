@@ -11,6 +11,10 @@ from sklearn.cluster import KMeans
 
 from src.data_loader import load_team_metrics
 from src.team_logos import show_team_logo
+from src.auth import check_login
+
+if not check_login():
+    st.stop()
 
 
 TEAM_METRIC_LABELS = {
