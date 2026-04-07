@@ -41,9 +41,14 @@ def build_duckdb():
         con.close()
 
 
-def query_events(sql: str) -> pd.DataFrame:
+@st.cache_resource
+def ensure_duckdb():
     if not DUCKDB_PATH.exists():
         build_duckdb()
+
+
+def query_events(sql: str) -> pd.DataFrame:
+    ensure_duckdb()
 
     try:
         con = duckdb.connect(str(DUCKDB_PATH), read_only=True)
@@ -53,7 +58,6 @@ def query_events(sql: str) -> pd.DataFrame:
             con.close()
 
     except Exception:
-        # Si el archivo existe pero está corrupto o inválido, lo reconstruimos
         if DUCKDB_PATH.exists():
             DUCKDB_PATH.unlink()
 
