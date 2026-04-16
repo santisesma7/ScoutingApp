@@ -260,7 +260,7 @@ df_all = load_player_metrics().copy()
 df_all["player_label"] = df_all.apply(build_player_label, axis=1)
 
 numeric_metric_cols = get_numeric_metric_cols(df_all)
-metric_options = [m for m in numeric_metric_cols if m in df_all.columns]
+metric_options = [m for m in numeric_metric_cols if m in df_all.columns and m != "minutes_total"]  # Exclude minutes_total to avoid sorting issues
 
 # --------------------------------------------------
 # FILTROS
@@ -352,6 +352,7 @@ ranking_df = (
         ["player_name", "team_name", "league", "season", "minutes_total", "position_group", "cluster_name", ranking_metric]
     ]
     .dropna(subset=[ranking_metric])
+    .drop_duplicates()  # Remove any duplicate rows
     .sort_values(ranking_metric, ascending=ascending_rank)
     .head(top_n)
     .reset_index(drop=True)
