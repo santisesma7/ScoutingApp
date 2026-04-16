@@ -6,6 +6,7 @@ from mplsoccer import Pitch, VerticalPitch
 
 from src.data_loader import load_player_metrics, query_events
 from src.player_clustering import plot_profile_pie
+from src.player_similarity import get_similar_players
 from src.auth import check_login
 
 if not check_login():
@@ -293,6 +294,7 @@ if not selected_player:
 
 player_row = df_players[df_players["player_label"] == selected_player].iloc[0]
 
+st.divider()
 # --------------------------------------------------
 # HEADER
 # --------------------------------------------------
@@ -365,9 +367,73 @@ with right_col:
         st.info("No hay información de estilo disponible para este jugador.")
 
 # --------------------------------------------------
+# JUGADORES SIMILARES
+# --------------------------------------------------
+st.subheader("Jugadores similares")
+st.caption("Ranking de jugadores con perfil similar basado en distancia euclidiana sobre métricas clave de su posición.")
+
+position_group = player_row.get("position_group")
+key_metrics = POSITION_KEY_METRICS.get(position_group, [
+    "passes_90",
+    "progressive_passes_90",
+    "key_passes_90",
+    "shots_90",
+    "recoveries_90",
+    "takeons_90",
+])
+
+key_metrics = [m for m in key_metrics if m in player_metrics.columns]
+
+similar_players_df = get_similar_players(
+    df_all=player_metrics,
+    player_row=player_row,
+    position_group=position_group,
+    key_metrics=key_metrics,
+    min_minutes_pct=0.30,
+    top_n=10,
+    use_expanded_metrics=True,
+)
+
+if similar_players_df.empty:
+    st.info("No hay jugadores similares disponibles con los filtros criterios.")
+else:
+    # Convert distance to a more intuitive similarity score (100% = identical)
+    similar_players_df = similar_players_df.copy()
+    similar_players_df['similitud_pct'] = (
+        100 * (1.0 / (1.0 + similar_players_df['similarity_distance']))
+    )
+
+    display_cols = [
+        'player_name',
+        'team_name',
+        'league',
+        'minutes_total',
+        'cluster_name',
+        'similitud_pct',
+        'age',
+    ]
+
+    display_df = similar_players_df[display_cols].copy()
+    display_df.insert(0, 'Ranking', range(1, len(display_df) + 1))
+    display_df = display_df.rename(columns={
+        'player_name': 'Jugador',
+        'team_name': 'Equipo',
+        'league': 'Liga',
+        'minutes_total': 'Minutos',
+        'cluster_name': 'Estilo',
+        'similitud_pct': 'Similitud (%)',
+        'age': 'Edad',
+    })
+    display_df['Similitud (%)'] = display_df['Similitud (%)'].round(0)
+
+    st.dataframe(display_df, use_container_width=True, hide_index=True)
+    
+st.divider()
+# --------------------------------------------------
 # TABLA DETALLADA
 # --------------------------------------------------
 st.subheader("Métricas detalladas")
+
 
 detail_cols = [
     "minutes_total",
