@@ -11,12 +11,12 @@ from sklearn.cluster import KMeans
 
 from src.data_loader import load_team_metrics
 from src.team_logos import show_team_logo
-from src.auth import check_login
+from src.accent_utils import get_accent_insensitive_selectbox
 
-if not check_login():
+# Verify authentication (set in Home.py)
+if not st.session_state.get("authenticated", False):
+    st.error("⚠️ Por favor, inicia sesión desde la [página principal](?)")
     st.stop()
-
-
 TEAM_METRIC_LABELS = {
     "matches_played": "Partidos jugados",
 
@@ -474,7 +474,7 @@ if mode == "MCB - Momento con balón":
     st.header("Informe individual de equipo")
 
     team_list = sorted(df_view["team_name"].dropna().unique().tolist())
-    selected_team = st.selectbox("Selecciona un equipo", team_list)
+    selected_team = get_accent_insensitive_selectbox("Selecciona un equipo", team_list, key="team_mcb")
 
     team_row = df_view[df_view["team_name"] == selected_team].iloc[0]
     team_cluster_name = team_row["ClusterName"]
@@ -660,7 +660,7 @@ if mode == "MSB - Momento sin balón":
     st.header("Informe individual de equipo")
 
     team_list = sorted(df_view["team_name"].dropna().unique().tolist())
-    selected_team = st.selectbox("Selecciona un equipo", team_list, key="team_def")
+    selected_team = get_accent_insensitive_selectbox("Selecciona un equipo", team_list, key="team_def")
 
     team_row = df_view[df_view["team_name"] == selected_team].iloc[0]
 

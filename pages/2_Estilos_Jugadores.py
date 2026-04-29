@@ -13,9 +13,10 @@ from src.player_clustering import (
     update_player_position
 )
 from src.data_loader import load_player_metrics
-from src.auth import check_login
 
-if not check_login():
+# Verify authentication (set in Home.py)
+if not st.session_state.get("authenticated", False):
+    st.error("⚠️ Por favor, inicia sesión desde la [página principal](?)")
     st.stop()
 
 

@@ -7,9 +7,11 @@ from mplsoccer import Pitch, VerticalPitch
 from src.data_loader import load_player_metrics, query_events
 from src.player_clustering import plot_profile_pie
 from src.player_similarity import get_similar_players
-from src.auth import check_login
+from src.accent_utils import get_accent_insensitive_selectbox
 
-if not check_login():
+# Verify authentication (set in Home.py)
+if not st.session_state.get("authenticated", False):
+    st.error("⚠️ Por favor, inicia sesión desde la [página principal](?)")
     st.stop()
 
 # --------------------------------------------------
@@ -282,7 +284,7 @@ df_players["player_label"] = (
 
 player_options = sorted(df_players["player_label"].dropna().unique().tolist())
 
-selected_player = st.selectbox(
+selected_player = get_accent_insensitive_selectbox(
     "Selecciona jugador",
     player_options,
     key="player_selector"

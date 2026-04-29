@@ -1,6 +1,9 @@
 from pathlib import Path
 import streamlit as st
 
+# MUST initialize session state FIRST before anything else
+st.session_state.setdefault("authenticated", False)
+
 from src.data_downloader import ensure_data_files
 from src.build_top5_events import build_top5_events
 from src.update_player_metrics import update_player_metrics
@@ -63,6 +66,20 @@ st.markdown(
         background: #f8fafc;
         border: 1px solid #e2e8f0;
         height: 100%;
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+
+    .section-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 24px rgba(59, 130, 246, 0.15);
+        border-color: #3b82f6;
+        background: linear-gradient(135deg, #f0f9ff 0%, #f8fafc 100%);
+    }
+
+    .section-card a {
+        text-decoration: none;
+        color: inherit;
     }
 
     .section-title {
@@ -70,6 +87,11 @@ st.markdown(
         font-weight: 700;
         margin-bottom: 0.45rem;
         color: #0f172a;
+        transition: color 0.3s ease;
+    }
+
+    .section-card:hover .section-title {
+        color: #3b82f6;
     }
 
     .section-text {
@@ -77,6 +99,8 @@ st.markdown(
         line-height: 1.58;
         color: #334155;
     }
+
+
 
     .mini-note {
         font-size: 0.93rem;
@@ -116,19 +140,17 @@ st.markdown(
 # --------------------------------------------------
 # MÓDULOS PRINCIPALES
 # --------------------------------------------------
-st.markdown("## Módulos principales")
+st.markdown("## 📌 Módulos principales")
 
 col1, col2, col3, col4 = st.columns(4)
 
-with col4:
+with col1:
     st.markdown(
         """
         <div class="section-card">
-            <div class="section-title">👤 Informe del Jugador</div>
+            <div class="section-title">🛡️ Estilos de Equipos</div>
             <div class="section-text">
-                Consulta el perfil individual de cualquier jugador de la base de datos.
-                Incluye métricas agregadas, campogramas de eventos, estilo detectado
-                y distribución híbrida de perfiles.
+                Análisis colectivo para identificar modelos de juego, clustering, PPDA y métricas tácticas.
             </div>
         </div>
         """,
@@ -141,22 +163,7 @@ with col2:
         <div class="section-card">
             <div class="section-title">🧠 Estilos de Jugadores</div>
             <div class="section-text">
-                Clasificación automática por posición a partir del estilo de juego.
-                Permite detectar perfiles como organizadores, regateadores o delanteros referencia.
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-with col1:
-    st.markdown(
-        """
-        <div class="section-card">
-            <div class="section-title">🛡️ Estilos de Equipos</div>
-            <div class="section-text">
-                Análisis colectivo de los equipos para identificar modelos de juego con balón
-                y comportamiento sin balón, combinando clustering, PPDA y métricas tácticas.
+                Clasificación automática por posición y estilo de juego. Detecta perfiles específicos.
             </div>
         </div>
         """,
@@ -169,8 +176,20 @@ with col3:
         <div class="section-card">
             <div class="section-title">📊 Análisis de Métricas</div>
             <div class="section-text">
-                Explora rankings dinámicos, scatter plots personalizables y comparaciones radar entre jugadores,
-                con filtros por liga, temporada, posición, perfil y minutos.
+                Rankings dinámicos, scatter plots y comparaciones radar con filtros avanzados.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+with col4:
+    st.markdown(
+        """
+        <div class="section-card">
+            <div class="section-title">👤 Informe del Jugador</div>
+            <div class="section-text">
+                Perfil individual con métricas, campogramas, estilo detectado y distribución de perfiles.
             </div>
         </div>
         """,
@@ -184,9 +203,8 @@ st.markdown(
         <div class="section-card">
             <div class="section-title">🛠️ Corrección y Mantenimiento</div>
             <div class="section-text">
-                Posibilidad de corregir manualmente posiciones de jugadores, actualizar datos al instante,
-                reconstruir métricas y recalcular clusters para mantener la herramienta alineada
-                con la realidad competitiva.
+                Corregir posiciones, actualizar datos al instante, reconstruir métricas 
+                y recalcular clusters para mantener la herramienta actualizada.
             </div>
         </div>
         """,
